@@ -48,13 +48,14 @@
 // ###################################################
 // #               SPEICHER-BEREICHE                 #
 // ###################################################
-#if (Bereiche * RotSize * 3 + 1) > EESize
+#if (Bereiche * 3 + Bereiche * RotSize * 3 + 1) > EESize
   #error "FEHLER: Nicht genügend Speicher fuer Kilometerstaende. In den Einstellungen 'Bereiche' und 'RotSize' einstellen."
 #endif
 #define ErsterSpeicher            (Bereiche * RotSize * 0 + 1)  // Start-Adresse Normaler Eeprom Speicherbereich (56 Byte groß) (Nie bei 0 anfangen!!)
 #define ZweiterSpeicher           (Bereiche * RotSize * 1 + 1)  // Start-Adresse Zweiter  Eeprom Speicherbereich (56 Byte groß) als Reserve
 #define ReserveSpeicher           (Bereiche * RotSize * 2 + 1)  // Start-Adresse Reserve Eeprom Speicherbereich (56 Byte groß), der nur bei genügend Spannung schreiben
-#define MerkerSpeicher            (Bereiche * RotSize * 3 + 1)  // Start-Adresse MerkerSpeicher zum Ablegen der Fahrradwartungsinformationen
+#define GesamtSpeicher            (Bereiche * RotSize * 3 + 1)  // Start Adresse Gesamt Eeprom Speicherbereich (21 Byte groß), hier wird der Gesamtkilometerstand gepeichert
+#define MerkerSpeicher            (Bereiche * 3 + Bereiche * RotSize * 3 + 1)  // Start-Adresse MerkerSpeicher zum Ablegen der Fahrradwartungsinformationen
 #define MerkerSize                (15 + Bereiche * 3)     // Größe eines Merkers in Byte (15Byte für Name-String, Bereiche * 3Byte für Werte)
 #define MerkerMax                 ((EESize-MerkerSpeicher) / MerkerSize)
 #if MerkerMax <= 0
@@ -103,7 +104,7 @@ volatile bool             LEDStatus2;                     // Hilft beim Blinken 
 volatile bool             ERROR = false;                  // Für Fehler beim Speicher-Laden in setup()
 volatile unsigned int     i,j,k,l;                        // Schleifenvariablen
 volatile byte             Temp,Temp2;                     // Variablen für Zwischenergebnisse
-volatile unsigned long    TempLong;
+volatile unsigned long    TempLong,TempLong2;
 volatile float            TempFloat;
 // ###################################################
 // #                   Funktionen                    #
@@ -406,8 +407,10 @@ void printBereiche(){
 // ###################################################
 void zeigeAktuell(){
   Serial.println("Aktueller Zaehlerstand:");
+  Serial.print("       ");
   printBereiche();
   Serial.println("   Summe  (in Kilometer)");
+  Serial.print("Trip   ");
   TempLong = 0;
   for(i=0; i<Bereiche; i++){
     spacesdec(Geschwindigkeit[i]/1000, 10-4);
@@ -416,7 +419,23 @@ void zeigeAktuell(){
     delay(10);
   }
   Serial.print(" = ");
-  Serial.println((float)TempLong/1000, 3); 
+  Serial.println((float)TempLong/1000, 3);
+  Serial.print("Gesamt ");
+  TempLong2 = 0;
+  for(k=0; k<Bereiche; k++){
+    TempLong = 0;
+    for(l=0; l<3; l++)
+      TempLong += (unsigned long)(EEPROM.read((GesamtSpeicher+(k*3)+l)) << 8*l);
+    TempFloat = (float)(TempLong+Geschwindigkeit[k]) / 10;
+    spacesdec(TempFloat, 10-2);
+    delay(1);
+    Serial.print(TempFloat,1);
+    TempLong2 += TempLong + Geschwindigkeit[k];
+  }
+  spacesdec(TempLong2/10, 14-2);
+  delay(1);
+  Serial.print(" = ");
+  Serial.println((float)TempLong2/10,1);
 }
 //###################
 #if MerkerMax > 0  // Beginn Merker Menü-Funktionen
@@ -442,7 +461,6 @@ void uebrtrageMerker(){
         Serial.print((char)Temp);
       }
       Serial.print(' ');
-      unsigned long TempLong2;
       TempLong2 = 0;
       for(k=0; k<Bereiche; k++){
         TempLong = 0;
@@ -583,6 +601,12 @@ void loescheZaehler(){
   while(Serial.available() == 0);  // Wartet auf Zeichen
   if(Serial.read() == 'j'){
     Serial.print("Zaehler loeschen...");
+    for(k=0; k<Bereiche; k++)
+      TempLong = 0;
+      for(l=0; l<3; l++)
+        TempLong += (unsigned long)(EEPROM.read(GesamtSpeicher+(k*3)+l) << 8*l);
+      for(l=0; l<3; l++)
+        EEPROM.write(GesamtSpeicher+(k*3)+l, byte(((int)(Geschwindigkeit[k]/100) + TempLong) >> 8*l));
     delZaehler();
     Serial.println("OK");
   }
