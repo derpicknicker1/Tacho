@@ -7,6 +7,7 @@
 // ###################################################
 #define Umfang                    2225                    // RadUmfang in mm
 #define Impulse                   28                      // Impulse vom Dynamo pro Umdrehung (28 Pole => 14 Perioden pro Umdrehung => 28 Flankenwechsel)
+#define StreckeAlt                0                       // Initialwert für die Gesamtstrecke, falls diese von einem anderen Tacho übernommen werden soll in ganzen Km. (bereits zurückgelegte Strecke vor in Betriebnahme)
 // ###################################################
 // #             HARDWARE-EINSTELLUNGEN              #
 // ###################################################
@@ -79,6 +80,7 @@ enum{                                                     // Aufzählung für Me
       MerkerMenu,
       EinstllMenu
     };
+// TODO: dynamisch
 const    byte             GeschwBereiche[Bereiche]        // Grenzen für die Geschwdigkeitsbereiche in Impulse / Sek
                           = {
                             BEREICH(6), 
@@ -399,7 +401,6 @@ void printBereiche(){
     Serial.print(BEREICH_KMH(i-1));
     Serial.print("km/h");
     }
-    
   }
 }
 // ###################################################
@@ -432,6 +433,7 @@ void zeigeAktuell(){
     Serial.print(TempFloat,1);
     TempLong2 += TempLong + Geschwindigkeit[k];
   }
+  TempLong2 += StreckeAlt;
   spacesdec(TempLong2/10, 14-2);
   delay(1);
   Serial.print(" = ");
